@@ -4,6 +4,8 @@ var querystring = require('querystring');
 var settings = require('./tccSettings');
 var htmlparser = require('htmlparser');
 var sys = require("sys");
+var jsid = '';
+
 index();
 
 function index(){
@@ -24,9 +26,9 @@ function index(){
     resp.on("end", function(){
       var cookie = resp.headers['set-cookie'][1];
       var idx = cookie.indexOf(";");
-      cookie = cookie.substring(0,idx);
-      console.log('JSESSIONID:=============>'+cookie);
-      login(cookie);
+      jsid = cookie.substring(0,idx);
+      console.log('JSESSIONID:=============>'+jsid);
+      login();
     });
   });
   idxReq.end();
@@ -39,7 +41,7 @@ function _getLoginPath(){
   return loginPath + fwParams;
 }
 
-function login(cookie){
+function login(){
 var opt = {
   host:settings.host,
   method :"post",
@@ -48,7 +50,7 @@ var opt = {
     protocol :settings.protocol||'http',
       referer : settings.referer||'http://'+settings.host,
     "user-agent":settings.userAgent,
-    'cookie':cookie
+    'cookie':jsid
   }
 }
 console.log('login path:=============>'+opt.path);
@@ -60,15 +62,16 @@ var req = http.request(opt, function(resp){
   resp.on("end", function(){
     var file = fs.createWriteStream('./tcc.html');
     file.write(respData,"utf-8");
-    //if(_isLoginSuccess(respData)){
-      getEmailList(cookie);
-    //};
+    if(_isLoginSuccess(respData)){
+      // get email list every one minute
+      setInterval(getEmailList, 1*60*1000);
+    };
   });
 });
 req.end();
 }
 
-function getEmailList(cookie){
+function getEmailList(){
   var opt = {
       host:settings.host,
       path:settings.pages.getEmailList,
@@ -77,7 +80,7 @@ function getEmailList(cookie){
         protocol :settings.protocol||'http',
           referer : settings.referer||'http://'+settings.host,
       "user-agent":settings.userAgent,
-      'Cookie':cookie
+      'Cookie':jsid
     }
   };
   console.log('start get mail list:============>'+opt.path);
@@ -96,7 +99,7 @@ function getEmailList(cookie){
    req.end();
 }
 
-function logout(cookie){
+function logout(){
   var opt = {
     host:settings.host,
     path:settings.pages.logout+settings.campusId,
@@ -104,7 +107,7 @@ function logout(cookie){
     headers:{
       protocol :settings.protocol||'http',
         referer : settings.referer||'http://'+settings.host,
-      cookie : cookie,
+      cookie : jsid,
       'user-agent':settings.userAgent,
     }
   };
@@ -129,7 +132,6 @@ function _isLoginSuccess(content){
     }else{
       var msgArea = htmlparser.DomUtils.getElementById('ccMsgArea', dom);
       var errInfo = htmlparser.DomUtils.getElementsByTagName('SPAN',msgArea);
-      console.log(errInfo[0]);
      if(errInfo[0]){
         console.log(errInfo[0].children[0].data);
         return false;
